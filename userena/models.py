@@ -15,26 +15,11 @@ from userena import settings as userena_settings
 from guardian.shortcuts import get_perms
 from guardian.shortcuts import assign
 
-from easy_thumbnails.fields import ThumbnailerImageField
-
 import datetime, random
 
 PROFILE_PERMISSIONS = (
             ('view_profile', 'Can view profile'),
 )
-
-def upload_to_mugshot(instance, filename):
-    """
-    Uploads a mugshot for a user to the ``USERENA_MUGSHOT_PATH`` and saving it
-    under unique hash for the image. This is for privacy reasons so others
-    can't just browse through the mugshot directory.
-
-    """
-    extension = filename.split('.')[-1].lower()
-    salt, hash = generate_sha1(instance.id)
-    return '%(path)s%(hash)s.%(extension)s' % {'path': userena_settings.USERENA_MUGSHOT_PATH,
-                                               'hash': hash[:10],
-                                               'extension': extension}
 
 class UserenaSignup(models.Model):
     """
@@ -205,16 +190,6 @@ class UserenaBaseProfile(models.Model):
         ('closed', _('Closed')),
     )
 
-    MUGSHOT_SETTINGS = {'size': (userena_settings.USERENA_MUGSHOT_SIZE,
-                                 userena_settings.USERENA_MUGSHOT_SIZE),
-                        'crop': userena_settings.USERENA_MUGSHOT_CROP_TYPE}
-
-    mugshot = ThumbnailerImageField(_('mugshot'),
-                                    blank=True,
-                                    upload_to=upload_to_mugshot,
-                                    resize_source=MUGSHOT_SETTINGS,
-                                    help_text=_('A personal image displayed in your profile.'))
-
     privacy = models.CharField(_('privacy'),
                                max_length=15,
                                choices=PRIVACY_CHOICES,
@@ -245,39 +220,6 @@ class UserenaBaseProfile(models.Model):
 
     def __unicode__(self):
         return 'Profile of %(username)s' % {'username': self.user.username}
-
-    def get_mugshot_url(self):
-        """
-        Returns the image containing the mugshot for the user.
-
-        The mugshot can be a uploaded image or a Gravatar.
-
-        Gravatar functionality will only be used when
-        ``USERENA_MUGSHOT_GRAVATAR`` is set to ``True``.
-
-        :return:
-            ``None`` when Gravatar is not used and no default image is supplied
-            by ``USERENA_MUGSHOT_DEFAULT``.
-
-        """
-        # First check for a mugshot and if any return that.
-        if self.mugshot:
-            return self.mugshot.url
-
-        # Use Gravatar if the user wants to.
-        if userena_settings.USERENA_MUGSHOT_GRAVATAR:
-            return get_gravatar(self.user.email,
-                                userena_settings.USERENA_MUGSHOT_SIZE,
-                                userena_settings.USERENA_MUGSHOT_DEFAULT)
-
-        # Gravatar not used, check for a default image.
-        else:
-            if userena_settings.USERENA_MUGSHOT_DEFAULT not in ['404', 'mm',
-                                                                'identicon',
-                                                                'monsterid',
-                                                                'wavatar']:
-                return userena_settings.USERENA_MUGSHOT_DEFAULT
-            else: return None
 
     def get_full_name_or_username(self):
         """
